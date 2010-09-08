@@ -59,7 +59,9 @@ sub _load_split_files {
     my($class, $method, $ext) = @_;
     return if $class->can($method);
 
-    my $file = $0;
+    my $file = do {
+        $class->can('path') && $class->path;
+    } || $0;
     $file =~ s/\.t$/.$ext/;
     return unless -f $file;
     no strict 'refs';
@@ -94,6 +96,11 @@ sub export {
         next if $class->can($method);
         no strict 'refs';
         *{"$class\::$method"} = sub { +() };
+    }
+
+    unless ($class->can('tests')) {
+        no strict 'refs';
+        *{"$class\::tests"} = sub () { 0 };
     }
 
 }

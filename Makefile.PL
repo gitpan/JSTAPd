@@ -3,18 +3,22 @@ name 'JSTAPd';
 all_from 'lib/JSTAPd.pm';
 githubmeta;
 
-requires 'HTTP::Engine';
+requires 'Plack';
+requires 'Twiggy';
 requires 'Data::Dumper';
 requires 'JSON::XS';
 requires 'HTTP::Request';
 requires 'LWP::UserAgent';
 requires 'Path::Class';
+requires 'Pod::Usage';
 requires 'Time::HiRes';
 requires 'Data::UUID';
 requires 'Test::TCP';
 requires 'FindBin';
 requires 'Getopt::Long';
+requires 'File::ShareDir';
 
+install_share 'share';
 install_script "scripts/jstapd";
 
 tests 't/*.t';

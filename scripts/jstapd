@@ -5,6 +5,7 @@ use lib 'lib';
 use Getopt::Long;
 use JSTAPd::Server;
 use Path::Class;
+use Pod::Usage;
 
 # From 'prove': Allow cuddling the paths with the -ignore_case
 @ARGV = map { /^(-I)(.+)/ ? ($1,$2) : $_ } @ARGV;
@@ -19,8 +20,8 @@ Getopt::Long::Configure("no_ignore_case", "pass_through");
 GetOptions(
     "new|n=s"      => \$new,
     "d|dir=s"      => \$dir,
-    "p|port=s"      => \$port,
-    "a|addr=s"      => \$host,
+    "port=s"       => \$port,
+    "host=s"       => \$host,
     'I=s@'         => \@includes,
     "h|help",      => \my $help,
 );
@@ -67,8 +68,8 @@ my $config = {
 # browser auto open
 # for run_once mode (prove -vl foo.t or prove -vlr jstap/)
 # this example for Mac OS X
-# $config->{auto_open_command} = 'open -a Safari %s';
-# or $ENV{JSTAP_AUTO_OPEN_COMMAND} = 'open -a Safari %s';
+# $config->{auto_open_command} = 'open -g -a Safari %s';
+# or $ENV{JSTAP_AUTO_OPEN_COMMAND} = 'open -g -a Safari %s';
 
 $config;
 END
@@ -78,29 +79,44 @@ END
     $fh = $f->openw;
     print $fh <<'END';
 use JSTAPd::Suite;
+sub tests { 6 }
 
-sub client_script {
-    return <<'DONE';
-tests(6);
+sub include {
+#    (
+#        'your-under-controll-scriptfile.js',
+#    );
+}
+
+sub include_ex {
+#    (
+#        'your-not-under-controll-scriptfile.js',
+#    );
+}
+END
+
+    $f = $d->file('01_base.js');
+    print "create $f\n";
+    $fh = $f->openw;
+    print $fh <<'END';
 ok(1, 'ok 1');
 ok(!0, 'ok 0');
 is('test', 'test', 'is');
 isnt('test', 'dev', 'isnt');
 like('test', new RegExp('es'), 'like');
 is(tap$('test').innerHTML, 'DATA', 'getElementById');
-DONE
-}
+END
 
-sub html_body {
-    return <<'DONE';
+    $f = $d->file('01_base.html');
+    print "create $f\n";
+    $fh = $f->openw;
+    print $fh <<'END';
 <div id='test'>DATA</div>
-DONE
-}
 END
 
     exit;
 }
 
+pod2usage(0) unless -d $dir;
 JSTAPd::Server->new( dir => $dir, port => $port, host => $host )->run;
 
 __END__
@@ -111,11 +127,11 @@ jstapd -
 
 =head1 SYNOPSIS
 
-# start server
-jstapd -d testdir
-  -p 1978     - listen port
-  -a 0.0.0.0  - listen address
+  # start server
+  jstapd -d testdir
+    --host 0.0.0.0  - listen address
+    --port 1978     - listen port
 
-# create new test
-jstapd -n foo/bar/dirname
+  # create new test
+  jstapd -n foo/bar/dirname
 

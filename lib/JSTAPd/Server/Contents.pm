@@ -1,7 +1,7 @@
+package JSTAPd::Server::Contents;
 use strict;
 use warnings;
-package JSTAPd::Server::Contents;
-use HTTP::Engine::Response;
+use Plack::Response;
 use Data::UUID;
 
 sub handler {
@@ -20,7 +20,7 @@ sub handler {
         eval 'require $klass' unless %{"$klass\::"}; ## no critic
     }
     unless (!$@ && ($klass->can($method) || $klass->can('AUTOLOAD'))) {
-        return HTTP::Engine::Response->new( status => 404, body => 'Not Found' );
+        return Plack::Response->new(404, [ 'Content-Type' => 'text/plain' ], 'Not Found' );
     }
     warn "$klass -> $method : " . $req->uri unless $server->run_once;
     $klass->$method($server, $req, $session, $args);
@@ -29,34 +29,19 @@ sub handler {
 # index page
 sub index {
     my($class, $server, $req, $session) = @_;
-    HTTP::Engine::Response->new( body => JSTAPd::Contents->build_index(
-        jstapd_prefix => $server->jstapd_prefix,
-        run_once      => $server->run_once,
-        auto_open     => $server->auto_open,
-    ));
+    return Plack::Response->new(
+        200, 
+        [ 'Content-Type' => 'text/html' ],
+        JSTAPd::Contents->build_index(
+            jstapd_prefix => $server->jstapd_prefix,
+            run_once      => $server->run_once,
+            auto_open     => $server->auto_open,
+        )
+    );
 }
 
 package JSTAPd::Server::Contents::contents;
 use JSON::XS ();
-
-sub _gen_li {
-    my $path = shift;
-    sprintf '<li><a href="%s">%s</a></li>', $path, $path;
-}
-sub _index {
-    my($class, $server, $req, $session, $chain) = @_;
-
-    my @li = _gen_li('../');
-    $server->contents->each( $chain => sub {
-        my($name, $is_dir) = @_;
-        return if $name eq 'index';
-        push @li, $is_dir ? _gen_li("$name/") : _gen_li($name);
-    });
-
-    my $index = $server->contents->fetch_file('index', $chain, 1);
-    my $body = sprintf "<ul>\n%s</ul>\n", join("\n", @li);
-    HTTP::Engine::Response->new( body => $index->build_html( '', $body ) );
-}
 
 sub AUTOLOAD {
     my($class, $server, $req, $session, $args) = @_;
@@ -71,6 +56,7 @@ sub AUTOLOAD {
 
     # foo.t
     $server->setup_session_tap($session, $path);
+    $server->set_tests($session, $path);
 
     my $content = $server->contents->fetch_file($basename, \@chain);
 
@@ -79,12 +65,14 @@ sub AUTOLOAD {
     }
 
     my @include = map {
-        ref($_) eq 'SCALAR' ? sprintf "include('/%s/js/%s')", $server->jstapd_prefix, ${ $_ } : "include('$_')"
+        ref($_) eq 'SCALAR' ? sprintf "include('/%s/share/js/%s')", $server->jstapd_prefix, ${ $_ } : "include('$_')"
     } $content->suite->include_ex, $content->suite->include;
 
     my $index   = $server->contents->fetch_file('index', \@chain, 1);
-    return HTTP::Engine::Response->new(
-        body => $index->build_html(
+    return Plack::Response->new(
+        200,
+        [ 'Content-Type' => 'text/html' ],
+        $index->build_html(
             $content->header(
                 jstapd_prefix => $server->jstapd_prefix,
                 session       => $session,
@@ -121,12 +109,12 @@ sub __run_api {
     if ($err) {
         my $body = sprintf "error: %s\n\t%s\n", $args->{path}, $err;
         warn $body;
-        return HTTP::Engine::Response->new( status => 500, body => $body );
+        return Plack::Response->new(500, [ 'Content-Type' => 'text/plain' ], $body );
     }
     if (ref($ret)) {
-        return HTTP::Engine::Response->new( body => JSON::XS->new->ascii->encode($ret) );
+        return Plack::Response->new(200, [ 'Content-Type' => 'application/json' ], JSON::XS->new->ascii->encode($ret) );
     } else {
-        return HTTP::Engine::Response->new( body => $ret );
+        return Plack::Response->new(200, [ 'Content-Type' => 'text/plain' ], $ret );
     }
 }
 
@@ -141,100 +129,8 @@ sub AUTOLOAD {
 
     my $body;
     $body = $class->$path if $class->can($path);
-    return HTTP::Engine::Response->new( status => 404, body => 'Not Found' ) unless $body;
-    return HTTP::Engine::Response->new( body => $body );
-}
-
-sub jquery_jstapd {
-    return <<'DONE';
-(function ($) {
-
-$.fn.is_visible = function(num){
-    window.is($($(this).selector+':visible').length, num, $(this).selector + ' is visible ' + num + ' items');
-    return this;
-};
-
-$.fn.isnt_visible = function(){
-    var ret = 0;
-    if ($($(this).selector+':visible').length == 0) {
-        ret = 1;
-    }
-    window.ok(ret, $(this).selector + ' is not visible');
-    return this;
-};
-
-$.fn.is_text = function(val){
-    window.is($(this).text(), val, $(this).selector + " text() is '" + val + "'");
-    return this;
-};
-
-$.fn.isnt_text = function(val){
-    window.isnt($(this).text(), val, $(this).selector + " text() is not '" + val + "'");
-    return this;
-};
-
-$.fn.like_text = function(val){
-    window.like($(this).text(), val, $(this).selector + " text() like '" + val.toString() + "'");
-    return this;
-};
-
-$.fn.unlike_text = function(val){
-    window.unlike($(this).text(), val, $(this).selector + " text() unlike '" + val.toString() + "'");
-    return this;
-};
-
-$.fn.is_formval = function(val){
-    window.is($(this).val(), val, $(this).selector + " form val() is '" + val + "'");
-    return this;
-};
-
-$.fn.isnt_formval = function(val){
-    window.isnt($(this).val(), val, $(this).selector + " form val() is not '" + val + "'");
-    return this;
-};
-
-$.fn.like_formval = function(val){
-    window.like($(this).val(), val, $(this).selector + " form val() like '" + val.toString() + "'");
-    return this;
-};
-
-$.fn.unlike_formval = function(val){
-    window.unlike($(this).val(), val, $(this).selector + " form val() unlike '" + val.toString() + "'");
-    return this;
-};
-
-$.fn.is_attr = function(name, val){
-    window.is($(this).attr(name), val, $(this).selector + " '" + name + "' attr is '" + val + "'");
-    return this;
-};
-
-$.fn.ok_hasClass = function(val){
-    window.ok($(this).hasClass(val), $(this).selector + " hasClass '" + val + "'");
-    return this;
-};
-
-$.fn.ok_hasntClass = function(val){
-    window.ok(!$(this).hasClass(val), $(this).selector + " hasntClass '" + val + "'");
-    return this;
-};
-
-$.fn.has_items_of = function(val){
-    window.is($(this).length, val, $(this).selector + " has items of " + val + "");
-    return this;
-};
-
-/*
-// for jquery ui *experimental*
-$.fh.pseudo_drop = function(drag, e){
-    if (!e) e = {};
-    var draggable = $(drag).data('draggable');
-    var droppable = $(this).data('droppable');
-    droppable._drop(e, draggable);
-};
-*/
-
-})(jQuery);
-DONE
+    return Plack::Response->new( 404, [ 'Content-Type' => 'text/plain' ], 'Not Found' ) unless $body;
+    return Plack::Response->new( 200, [ 'Content-Type' => 'text/plain' ], $body );
 }
 
 1;

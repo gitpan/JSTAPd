@@ -1,9 +1,9 @@
 use JSTAPd::Suite;
 
+sub tests { 15 }
+
 sub client_script {
     return <<'DONE';
-tests(15);
-
 // show hide
 $('.test').is_visible(5);
 $('.test').hide();
@@ -47,6 +47,7 @@ DONE
 }
 
 sub include_ex {
-    'http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js',
+#    'http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js',
+    '/jslib/jquery-1.3.2.min.js',
     \'jquery-jstapd.js',
  }

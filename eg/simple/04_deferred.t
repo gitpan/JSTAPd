@@ -1,8 +1,9 @@
 use JSTAPd::Suite;
 
+sub tests { 27 }
+
 sub client_script {
     return <<'DONE';
-tests(27);
 var c = 0;
 // next
 jstapDeferred.next(function(){
@@ -29,7 +30,7 @@ var t = new Date();
 return jstapDeferred.wait(100).next(function(v){ // 1, 2
     is(c++, 0, 'wait count 0');
     var el = (new Date).getTime() - t.getTime();
-    is((el < 110 && el > 90), true, 'wait elapsed');
+    is((el < 190 && el > 9), true, 'wait elapsed');
     return 'next1';
 }).next(function(val){ // 3
     is(c++, 1, 'wait count 1');
@@ -40,7 +41,7 @@ return jstapDeferred.wait(100).next(function(v){ // 1, 2
 wait(200).next(function(val,x){ // 4(7), 5 
     is(c++, 2, 'wait count 2');
     var el = (new Date).getTime() - t.getTime();
-    is((el < 210 && el > 190), true, 'wait elapsed 2');
+    is((el < 310 && el > 90), true, 'wait elapsed 2');
     is(val, 'next2', 'wait next 2');
     return 'next3';
 }).next(function(val){ // 6
